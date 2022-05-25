@@ -423,10 +423,6 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
     loop {
         c = brace_gobbler(&text, &mut i, '{');
         if c.is_none() {
-            // println!(
-            //     "brace_expand: text[{}] broken at first gobble with i {}",
-            //     text, i
-            // );
             break;
         }
         let c1 = c;
@@ -437,18 +433,10 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
         if c.is_none() {
             // it's not
             i += 1;
-            // println!(
-            //     "brace_expand: text[{}] continueing at second gobble i {}",
-            //     text, i
-            // );
             continue;
         } else {
             // it is
             c = c1;
-            // println!(
-            //     "brace_expand: text[{}] broken at second gobble with i {} c {:?}",
-            //     text, i, c
-            // );
             break;
         }
     }
@@ -456,10 +444,6 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
     // Special case.  If we never found an exciting character, then
     // the preamble is all of the text, so just return that.
     if c != Some('{') {
-        // println!(
-        //     "text: {} retuns here with c {:?} with preable {} with i {}",
-        //     text, c, result[0], i
-        // );
         return result;
     }
     // Find the amble.  This is the stuff inside this set of braces.
@@ -493,8 +477,6 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
             break;
         }
     }
-
-    // println!("text: {} amble: {}, j {:?}", text, amble, j);
 
     fn add_tack(postamble: &str, tack: Vec<String>, result: Vec<String>) -> Vec<String> {
         let res = array_concat(&result, &tack).to_owned();
