@@ -179,8 +179,6 @@ fn expand_amble(text: &str) -> Vec<String> {
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 enum StTypes {
-    #[allow(dead_code)]
-    Bad,
     Int,
     Char,
     ZInt,
@@ -224,9 +222,6 @@ fn mkseq(start: isize, end: isize, incr: isize, t: StTypes, width: usize) -> Vec
             }
             StTypes::Char => {
                 result.push(String::from(n as u8 as char));
-            }
-            StTypes::Bad => {
-                return vec![];
             }
         }
         if n.checked_add(incr).is_none() {
