@@ -5,7 +5,6 @@
 // based on https://stackoverflow.com/a/28528753 after porting it to C++
 // Also based on braces.c from bash (9439ce09) after porting it to C++, since it makes sense.
 
-use std;
 use std::borrow::Cow;
 use std::convert::Into;
 use std::str::Chars;
@@ -137,16 +136,15 @@ fn brace_gobbler(text: &str, indx: &mut usize, satisfy: char) -> Option<char> {
         // if we see a close brace, we need to decrement the level
         } else if c == Some('}') && level > 0 {
             level -= 1;
-        } else if satisfy == '}' && level == 0 {
-            if c == Some(BRACE_ARG_SEPARATOR) {
-                needs_expanding = true;
-            // check if text[i+2] == '}'
-            } else if chars_copy.next() != Some('}')
-                // should be fine to use .get here since we only care about ascii ".."
-                && chars.as_str().get(0..2) == Some(BRACE_SEQ_SPECIFIER)
-            {
-                needs_expanding = true;
-            }
+        } else if satisfy == '}'
+            && level == 0
+            && (c == Some(BRACE_ARG_SEPARATOR)
+                // check if text[i+2] == '}'
+                || (chars_copy.next() != Some('}')
+                    // should be fine to use .get here since we only care about ascii ".."
+                    && chars.as_str().get(0..2) == Some(BRACE_SEQ_SPECIFIER)))
+        {
+            needs_expanding = true;
         }
     }
     c
@@ -182,10 +180,10 @@ fn expand_amble(text: &str) -> Vec<String> {
 #[derive(PartialEq, Copy, Clone, Debug)]
 enum StTypes {
     #[allow(dead_code)]
-    StBad,
-    StInt,
-    StChar,
-    StZInt,
+    Bad,
+    Int,
+    Char,
+    ZInt,
 }
 
 // Make a sequence of strings starting from START to END, inclusive.
@@ -193,7 +191,7 @@ enum StTypes {
 fn mkseq(start: isize, end: isize, incr: isize, t: StTypes, width: usize) -> Vec<String> {
     let incr = {
         if incr == 0 {
-            1 as isize
+            1_isize
         } else if start > end && incr > 0 {
             -incr
         } else if start < end && incr < 0 {
@@ -218,16 +216,16 @@ fn mkseq(start: isize, end: isize, incr: isize, t: StTypes, width: usize) -> Vec
     loop {
         let n_str = n.to_string();
         match t {
-            StTypes::StInt => {
+            StTypes::Int => {
                 result.push(n_str);
             }
-            StTypes::StZInt => {
-                result.push("0".repeat(width.checked_sub(n_str.len()).unwrap_or(0)) + (&n_str));
+            StTypes::ZInt => {
+                result.push("0".repeat(width.saturating_sub(n_str.len())) + (&n_str));
             }
-            StTypes::StChar => {
+            StTypes::Char => {
                 result.push(String::from(n as u8 as char));
             }
-            StTypes::StBad => {
+            StTypes::Bad => {
                 return vec![];
             }
         }
@@ -316,19 +314,19 @@ fn expand_seqterm(text: &str) -> Vec<String> {
     assert!(incr != 0);
 
     fn get_type_of_string(s: &str) -> Option<StTypes> {
-        if s.len() == 0 {
+        if s.is_empty() {
             return None;
         }
         let mut chars = s.chars();
         let c = chars.next().unwrap();
         if s.len() == 1 && c.is_alphabetic() {
-            return Some(StTypes::StChar);
+            return Some(StTypes::Char);
         }
         if s.parse::<isize>().is_ok() {
             if s.len() > 2 && (c == '0' || (c == '-' && chars.next() == Some('0'))) {
-                return Some(StTypes::StZInt);
+                return Some(StTypes::ZInt);
             } else {
-                return Some(StTypes::StInt);
+                return Some(StTypes::Int);
             }
         }
         None
@@ -354,14 +352,14 @@ fn expand_seqterm(text: &str) -> Vec<String> {
     };
 
     // check if lhs and rhs are of the same type, but count Zint and Int to be the same
-    if lhs_type != rhs_type && lhs_type != StTypes::StZInt && rhs_type != StTypes::StZInt {
+    if lhs_type != rhs_type && lhs_type != StTypes::ZInt && rhs_type != StTypes::ZInt {
         return vec![];
     }
 
     // OK, we have something.  It's either a sequence of integers, ascending
     // or descending, or a sequence or letters, ditto.  Generate the sequence,
     // put it into a string vector, and return it.
-    if lhs_type == StTypes::StChar {
+    if lhs_type == StTypes::Char {
         return mkseq(
             lhs.chars().next().unwrap() as isize,
             rhs.chars().next().unwrap() as isize,
@@ -376,14 +374,14 @@ fn expand_seqterm(text: &str) -> Vec<String> {
         rhs.parse().unwrap(),
         incr,
         {
-            if rhs_type == StTypes::StZInt {
-                StTypes::StZInt
+            if rhs_type == StTypes::ZInt {
+                StTypes::ZInt
             } else {
                 lhs_type
             }
         },
         {
-            if lhs_type == StTypes::StZInt || rhs_type == StTypes::StZInt {
+            if lhs_type == StTypes::ZInt || rhs_type == StTypes::ZInt {
                 std::cmp::max(lhs.chars().count(), rhs.chars().count())
             } else {
                 0
@@ -393,10 +391,10 @@ fn expand_seqterm(text: &str) -> Vec<String> {
 }
 
 fn array_concat<'a>(arr1: &'a Vec<String>, arr2: &'a Vec<String>) -> Cow<'a, Vec<String>> {
-    if arr1.len() == 0 {
+    if arr1.is_empty() {
         return Cow::Borrowed(arr2);
     }
-    if arr2.len() == 0 {
+    if arr2.is_empty() {
         return Cow::Borrowed(arr1);
     }
 
@@ -415,7 +413,7 @@ fn array_concat<'a>(arr1: &'a Vec<String>, arr2: &'a Vec<String>) -> Cow<'a, Vec
 pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
     let text = text.into();
 
-    if text.len() == 0 {
+    if text.is_empty() {
         return vec![];
     }
 
@@ -461,9 +459,7 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
             break;
         }
     }
-    let preamble = text_chars.clone().take(i).collect::<String>();
-    let mut result = Vec::new();
-    result.push(preamble);
+    let mut result = vec![text_chars.clone().take(i).collect::<String>()];
     // Special case.  If we never found an exciting character, then
     // the preamble is all of the text, so just return that.
     if c != Some('{') {
@@ -510,7 +506,7 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
 
     fn add_tack(postamble: &str, tack: Vec<String>, result: Vec<String>) -> Vec<String> {
         let res = array_concat(&result, &tack).to_owned();
-        if postamble.len() == 0 {
+        if postamble.is_empty() {
             return res.into_owned();
         }
         array_concat(&res, &brace_expand(postamble.to_string()))
@@ -521,7 +517,7 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
 
     if j.is_none() {
         let tack = expand_seqterm(&amble);
-        if tack.len() != 0 {
+        if !tack.is_empty() {
             return add_tack(&postamble, tack, result);
         }
         // If the sequence expansion fails (e.g., because the integers
@@ -878,18 +874,18 @@ mod brace_expand_tests {
 mod mksq_tests {
     #[test]
     fn single_int() {
-        assert_eq!(super::mkseq(3, 3, 1, super::StTypes::StInt, 0), vec!["3"]);
+        assert_eq!(super::mkseq(3, 3, 1, super::StTypes::Int, 0), vec!["3"]);
     }
 
     #[test]
     fn padded_single_int() {
-        assert_eq!(super::mkseq(3, 3, 1, super::StTypes::StZInt, 2), vec!["03"]);
+        assert_eq!(super::mkseq(3, 3, 1, super::StTypes::ZInt, 2), vec!["03"]);
     }
 
     #[test]
     fn incremented_int() {
         assert_eq!(
-            super::mkseq(1, 5, 3, super::StTypes::StInt, 0),
+            super::mkseq(1, 5, 3, super::StTypes::Int, 0),
             vec!["1", "4"]
         );
     }
@@ -897,7 +893,7 @@ mod mksq_tests {
     #[test]
     fn padded_incremented_int() {
         assert_eq!(
-            super::mkseq(1, 5, 3, super::StTypes::StZInt, 2),
+            super::mkseq(1, 5, 3, super::StTypes::ZInt, 2),
             vec!["01", "04"]
         );
     }
@@ -905,7 +901,7 @@ mod mksq_tests {
     #[test]
     fn incremented_int_with_negative_increment() {
         assert_eq!(
-            super::mkseq(1, 5, -3, super::StTypes::StInt, 0),
+            super::mkseq(1, 5, -3, super::StTypes::Int, 0),
             vec!["1", "4"]
         );
     }
@@ -913,7 +909,7 @@ mod mksq_tests {
     #[test]
     fn alphabet() {
         assert_eq!(
-            super::mkseq('A' as isize, 'D' as isize, 1, super::StTypes::StChar, 0),
+            super::mkseq('A' as isize, 'D' as isize, 1, super::StTypes::Char, 0),
             vec!["A", "B", "C", "D"]
         );
     }
@@ -921,7 +917,7 @@ mod mksq_tests {
     #[test]
     fn large_int() {
         assert_eq!(
-            super::mkseq(2147483645, 2147483649, 1, super::StTypes::StInt, 0),
+            super::mkseq(2147483645, 2147483649, 1, super::StTypes::Int, 0),
             vec![
                 "2147483645",
                 "2147483646",
@@ -935,7 +931,7 @@ mod mksq_tests {
     #[test]
     fn descending_incremented_int() {
         assert_eq!(
-            super::mkseq(10, 0, 2, super::StTypes::StInt, 0),
+            super::mkseq(10, 0, 2, super::StTypes::Int, 0),
             vec!["10", "8", "6", "4", "2", "0"]
         );
     }
