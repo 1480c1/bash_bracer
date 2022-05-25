@@ -1,0 +1,12 @@
+[package]
+authors = ["Christopher Degawa <ccom@randomderp.com>"]
+categories = ["command-line-utilities"]
+edition = "2021"
+license = "GPL-3.0-or-later"
+name = "bash_bracer"
+publish = false
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
