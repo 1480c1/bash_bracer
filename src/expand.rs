@@ -55,10 +55,9 @@ fn brace_gobbler(text: &str, indx: &mut usize, satisfy: char) -> Option<char> {
 
     // holds text[i]
     let mut c = None;
-    let mut prev_char;
     loop {
         // holds text[i-1]
-        prev_char = c;
+        let prev_char = c;
         c = chars.next();
         if c.is_none() {
             break;
@@ -159,12 +158,13 @@ fn expand_amble(text: &str) -> Vec<String> {
 
     loop {
         let c = brace_gobbler(text, &mut i, BRACE_ARG_SEPARATOR);
-        let tem = chars
-            .clone()
-            .skip(start)
-            .take(i - start)
-            .collect::<String>();
-        for s in brace_expand(tem) {
+        for s in brace_expand(
+            chars
+                .clone()
+                .skip(start)
+                .take(i - start)
+                .collect::<String>(),
+        ) {
             result.push(s);
         }
 
@@ -420,8 +420,6 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
 
     /* Make sure that when we exit this loop, c == None or text[i] begins a
     valid brace expansion sequence. */
-
-    // let mut chars_clone = text_chars.clone();
     loop {
         c = brace_gobbler(&text, &mut i, '{');
         if c.is_none() {
@@ -454,7 +452,7 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
             break;
         }
     }
-    let mut result = vec![text_chars.clone().take(i).collect::<String>()];
+    let result = vec![text_chars.clone().take(i).collect::<String>()];
     // Special case.  If we never found an exciting character, then
     // the preamble is all of the text, so just return that.
     if c != Some('{') {
@@ -470,8 +468,7 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
     c = brace_gobbler(&text, &mut i, '}');
 
     if c.is_none() {
-        result[0] = text;
-        return result;
+        return vec![text.to_string()];
     }
 
     let amble = text_chars
@@ -510,24 +507,24 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
     }
     let postamble = text.chars().skip(i + 1).collect::<String>();
 
-    if j.is_none() {
-        let tack = expand_seqterm(&amble);
-        if !tack.is_empty() {
-            return add_tack(&postamble, tack, result);
-        }
-        // If the sequence expansion fails (e.g., because the integers
-        // overflow), but there is more in the string, try and process
-        // the rest of the string, which may contain additional brace
-        // expansions.  Treat the unexpanded sequence term as a simple
-        // string (including the braces). */
-        if text.chars().nth(i + 1).is_some() {
-            return add_tack(&postamble, vec![amble], result);
-        }
-        result[0] = text;
-        return result;
+    if j.is_some() {
+        return add_tack(&postamble, expand_amble(&amble), result);
     }
+
+    let tack = expand_seqterm(&amble);
+    if !tack.is_empty() {
+        return add_tack(&postamble, tack, result);
+    }
+    // If the sequence expansion fails (e.g., because the integers
+    // overflow), but there is more in the string, try and process
+    // the rest of the string, which may contain additional brace
+    // expansions.  Treat the unexpanded sequence term as a simple
+    // string (including the braces). */
+    if text_chars.clone().nth(i + 1).is_some() {
+        return add_tack(&postamble, vec![amble], result);
+    }
+    vec![text.to_string()]
     // END SHELL SPECIFIC
-    add_tack(&postamble, expand_amble(&amble), result)
 }
 
 // does space, tab, newline, and backslash expansion on a string and returns a vector of strings expanded
