@@ -479,13 +479,11 @@ pub fn brace_expand<S: Into<String>>(text: S) -> Vec<String> {
     }
 
     fn add_tack(postamble: &str, tack: Vec<String>, result: Vec<String>) -> Vec<String> {
-        let res = array_concat(&result, &tack).to_owned();
+        let res = array_concat(&result, &tack);
         if postamble.is_empty() {
             return res.into_owned();
         }
-        array_concat(&res, &brace_expand(postamble.to_string()))
-            .to_owned()
-            .into_owned()
+        array_concat(&res, &brace_expand(postamble.to_string())).into_owned()
     }
     let postamble = text.chars().skip(i + 1).collect::<String>();
 
